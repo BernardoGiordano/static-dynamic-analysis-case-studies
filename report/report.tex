@@ -4,7 +4,6 @@
 \usepackage{natbib}
 
 \setlength\parindent{0pt}
-\renewcommand{\labelenumi}{\alph{enumi}.}
 \title{Analisi statica e dinamica \\ di codice C/C++ \\ con cppcheck e valgrind}
 \author{\textsc{Bernardo Giordano A18/254}}
 \date{\today}
@@ -16,10 +15,92 @@
 %	SECTION 1
 %----------------------------------------------------------------------------------------
 
-\section{Section 1}
+\section{Introduzione}
 
-\subsection{Subsection}
-\label{subsection}
+\subsection{Obiettivo}
+\label{sec:obiettivo}
+
+L'obiettivo dell'assignment è quello di approfondire le tecniche di analisi
+statica e dinamica del codice \texttt{C}/\texttt{C++} per scoprire problemi relativi allo
+scorretto utilizzo della memoria, come ad esempio mancata deallocazione (memory
+leak), accesso a locazioni di memoria non valide e undefined behaviour.
+
+In particolare, si approfondiranno i software open source \texttt{cppcheck} e
+\texttt{valgrind} rispettivamente per l'analisi statica e quella dinamica.
+
+\subsection{Analisi statica}
+\label{sec:analisistatica}
+
+L'analisi statica è un processo di valutazione di un sistema (in questo caso
+software) o di un suo componente, volto all'analisi della sua forma, contenuto e
+struttura senza che esso sia messo in esecuzione. Nella maggior parte dei casi,
+l'analisi statica viene eseguita direttamente sul codice sorgente o sul codice
+oggetto del programma.
+
+L'analisi statica effettuata sul software varia a seconda del tool, in quanto
+alcuni vanno a considerare solo il comportamento degli statement singoli e le
+dichiarazioni di variabili all'interno di una porzione circoscritta di codice,
+mentre altri vanno ad effettuare una analisi complessiva a partire dal codice
+sorgente completo del programma. 
+
+Le informazioni che si ricavano da un processo di analisi statica variano sono
+molto variegate:
+
+\begin{enumerate}
+    \item highlighting di errori nel coding (sintattici o meno), come avviene
+    per i tool di \emph{linting}
+    \item segnalazione di variabili dichiarate e mai usate
+    \item segnalazione di funzioni dichiarate e mai invocate
+    \item segnalazione di memoria mai deallocata (\emph{memory leak})
+    \item segnalazione di possibili loop infiniti dovuti all'irraggiungibilità
+    di una o più condizioni di arresto
+    \item \ldots
+\end{enumerate}
+
+L'analisi statica è una fase molto importante dello sviluppo del software (in
+particolare in fase di validazione) e viene utilizzata spesso per sistemi
+safety-critical e per scovare codice potenzialmente vulnerabile. Un corretto
+utilizzo di questa tecnica previene l'occorrenza di errori all'interno del
+software in fase di esecuzione e permette di rilasciare software in produzione
+che non presenta guasti che spesso si vanno a scoprire solo con il codice in
+esecuzione, quando magari è già tardi perché si sono già manifestati in fallimenti.
+
+Tra le varie tecniche di analisi statica troviamo:
+
+\begin{itemize}
+    \item Analisi statica in compilazione: viene effettuata dal compilatore
+    prima di generare il codice oggetto, per verificare caratteristiche di
+    correttezza (sintattica, di coerenza tra tipi e parametri, codice non raggiungibile)
+    \item Code reading: lettura individuale del codice per evidenziare
+    errori/discrepanze con il progetto (tecniche basate su checklist o guidate
+    dai casi d'uso)
+    \item Code review: riunioni formali a cui partecipa un gruppo di persone che
+    revisiona il codice allo stesso tempo
+    \item Walkthrough: simulazione di casi di test eseguendo le istruzioni nel
+    codice a mano
+    \item Analisi del dataflow: studio del \emph{Control Flow Graph}
+    \item Esecuzione simbolica: esecuzione del programma con valori simbolici
+    dei dati di input invece che con valori effettivi
+\end{itemize}
+
+\subsection{Analisi dinamica}
+\label{sec:analisidinamica}
+
+L'analisi dinamica è un processo di analisi del software che prevede
+l'esecuzione di un programma su un processore reale o virtuale. \\
+
+Ci sono diverse tipologie di analisi dinamica:
+
+\begin{itemize}
+    \item Code coverage:
+    \item Memory error detection:
+    \item Fault localization:
+    \item Concurrency errors:
+    \item Performance analysis:
+\end{itemize}
+
+\subsection{Aging}
+\label{sec:aging}
  
 %----------------------------------------------------------------------------------------
 %	SECTION 2
