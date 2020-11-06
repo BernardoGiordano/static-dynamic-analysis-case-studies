@@ -2,9 +2,19 @@
 
 \usepackage{graphicx}
 \usepackage{natbib}
+\usepackage{listings}
+\usepackage{polyglossia}
+\setdefaultlanguage{italian}
+\setotherlanguages{english}
+\lstset{basicstyle=\ttfamily\footnotesize,breaklines=true}
 
 \setlength\parindent{0pt}
-\title{Analisi statica e dinamica \\ di codice C/C++ \\ con cppcheck e valgrind}
+\title{
+    Analisi statica e dinamica di codice \texttt{C/C++} \\ con
+    \texttt{Cppcheck} e \texttt{Valgrind} \\ \vspace{16px}
+    \small Corso di Affidabilità e Sicurezza \\ dei Sistemi Software Complessi A.A. 2019/2020
+}
+
 \author{\textsc{Bernardo Giordano A18/254}}
 \date{\today}
 
@@ -25,8 +35,8 @@ statica e dinamica del codice \texttt{C}/\texttt{C++} per scoprire problemi rela
 scorretto utilizzo della memoria, come ad esempio mancata deallocazione (memory
 leak), accesso a locazioni di memoria non valide e undefined behaviour.
 
-In particolare, si approfondiranno i software open source \texttt{cppcheck} e
-\texttt{valgrind} rispettivamente per l'analisi statica e quella dinamica.
+In particolare, si approfondiranno i software open source \texttt{Cppcheck} e
+\texttt{Valgrind} rispettivamente per l'analisi statica e quella dinamica.
 
 \subsection{Analisi statica}
 \label{sec:analisistatica}
@@ -126,8 +136,51 @@ Ci sono diverse tipologie di analisi dinamica:
 \subsection{Panoramica}
 \label{sec:valgrind:panoramica}
 
+Valgrind è un framework in grado di fornire una strumentazione ai binari dello spazio utente. \\
+
+Valgrind rende disponibili un certo numero di strumenti per il profiling per il
+miglioramento delle prestazioni e per una esecuzione corretta
+delle applicazioni. Questi strumenti sono in grado di rilevare errori relativi
+ai thread e alla memoria, permettendo
+così una identificazione e correzione più semplice degli errori nel codice
+dell'applicazione. Essi sono in grado di analizzare la cache, l'heap e la
+previsione del branch, per identificare i fattori in grado di aumentare la
+velocità dell'applicazione e ridurre l'uso della memoria. \\
+
+Valgrind analizza l'applicazione eseguendola su una CPU sintetica, monitorandola
+e misurando le prestazioni del codice esistente durante la sua esecuzione.
+Successivamente stampa dei report identificando ogni processo presente
+nell'esecuzione dell'applicazione su un descrittore del file specificato
+dall'utente, un file, o una socket di rete. Il livello di arricchimento delle
+funzioni eseguite varia in base
+allo strumento di Valgrind usato e alle impostazioni, ed è importante notare
+che l'esecuzione di un codice "instrumentato" può richiedere un tempo dai 4-50
+volte più lungo rispetto al tempo di esecuzione normale. \\
+
+Valgrind può essere usato sulle applicazioni senza alcuna ricompilazione
+aggiuntiva. Tuttavia, poichè Valgrind utilizza informazioni di debugging per
+definire le problematiche nel codice, se l'applicazione e le librerie di
+supporto non sono state compilate con informazioni di debugging abilitate, è
+generalmente consigliato ricompilare l'applicazione in modalità di debug.
+
 \subsection{Installazione}
 \label{sec:valgrind:installazione}
+
+Il framework Valgrind può essere installato in maniera semplice da un repository
+che lo contiene, oppure installandolo direttamente da pacchetto. Ad esempio, su
+una distribuzione Debian/Ubuntu: \\
+
+\begin{lstlisting}[language=bash]
+sudo apt install valgrind
+\end{lstlisting}
+
+Generalmente, Valgrind viene eseguito nel seguente modo:
+
+\begin{lstlisting}[language=bash]
+valgrind --tool=toolname program
+\end{lstlisting}
+dove \texttt{toolname} è il nome dello strumento di Valgrind desiderato, e
+\texttt{program} è il nome del programma desiderato da usare con Valgrind.
 
 \subsection{Funzionalità}
 \label{sec:valgrind:funzionalita}
