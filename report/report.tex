@@ -344,7 +344,7 @@ Memcheck fornisce diverse opzioni a riga di comando per rendere l'analisi più f
 \subsubsection{Cachegrind}
 
 Cachegrind è un profiler della cache. Esegue una simulazione dettagliata delle
-cache L1 ed L2 nella CPU e quindi può individuare con precisione le fonti di
+cache L2 nella CPU e quindi può individuare con precisione le fonti di
 \emph{cache miss} nel codice. Identifica il numero di cache miss, riferimenti di
 memoria e istruzioni eseguite per ogni riga di codice sorgente, con riepiloghi
 per funzione, per modulo e per l'intero programma. È utilizzabile con programmi scritti
@@ -456,24 +456,116 @@ facilitare l'esplorazione dei risultati di profiling.
 %	SECTION 4
 %----------------------------------------------------------------------------------------
 
+\newpage
 \section{Esempi di utilizzo}
 
-\subsection{Esempio 1}
-\label{sec:esempio1}
+\subsection{Caso 1}
+\label{sec:caso1}
 
-\subsection{Esempio 2}
-\label{sec:esempio2}
+\newpage
+\subsection{Caso 2}
+\label{sec:caso2}
 
-\subsection{Esempio 3}
-\label{sec:esempio3}
+\newpage
+\subsection{Caso 3}
+\label{sec:caso3}
 
-\subsection{Esempio 4}
-\label{sec:esempio4}
+\newpage
+\subsection{Caso 4}
+\label{sec:caso4}
+
+\begin{lstlisting}[language=c]
+#include <stdio.h>
+
+int main(int argc, char** argv) {
+    char buffer[10];
+    if (argc == 2) {
+        sprintf(buffer, "%s", argv[1]);
+    }
+    printf("%s\n", buffer);
+    return 0;
+}
+\end{lstlisting}
+
+Il seguente codice può presentare undefined behaviour se al programma non
+vengono passati parametri (o ne viene passato più di uno), in quanto viene
+stampato un buffer di caratteri non inizializzato in output. Inoltre, il
+programma presenta codice non sicuro in quanto viene utilizzata la funzione
+\texttt{sprintf} invece che la sua variante più safe \texttt{snprintf}, che
+permette di specificare quanti byte scrivere nel buffer destinazione. In questo
+caso, se come parametro al programma viene passato un argomento più lungo di 10
+caratteri, si verificherà uno stack smashing in esecuzione. \\
+
+Compilo il codice con \texttt{gcc main.c}. \\
+
+Lo eseguo passando come parametro una stringa più lunga di 10 caratteri:
+
+\begin{lstlisting}[language=bash]
+$ ./a.out testtesttest
+testtesttest
+*** stack smashing detected ***: terminated
+Annullato (core dump creato)
+\end{lstlisting}
+
+Cppcheck non è in grado di rilevare l'errore, se viene invocato \texttt{cppcheck
+main.c}. \\
+
+Valgrind restituisce un output più dettagliato e rileva gli errori previsti da
+questo caso di studio.
+
+\begin{lstlisting}[language=bash]
+$ valgrind --track-origins=yes -s ./a.out 
+==14564== Memcheck, a memory error detector
+...
+==14564== ERROR SUMMARY: 1 errors from 1 contexts 
+==14564== 
+==14564== 1 errors in context 1 of 1:
+==14564== Conditional jump or move depends on uninitialised value(s)
+==14564==    at 0x483EF49: strlen
+==14564==    by 0x48F05B3: puts
+==14564==    by 0x1091DF: main
+==14564==  Uninitialised value was created by a stack allocation
+==14564==    at 0x109189: main
+==14564== 
+==14564== ERROR SUMMARY: 1 errors from 1 contexts 
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash]
+$ valgrind --track-origins=yes -s ./a.out testtesttest
+==14672== Memcheck, a memory error detector
+...
+==14672== Command: ./a.out testtesttest
+==14672== 
+testtesttest
+*** stack smashing detected ***: terminated
+==14672== 
+==14672== Process terminating with default action of signal 6 (SIGABRT)
+==14672==    at 0x48AF18B: raise (raise.c:51)
+==14672==    by 0x488E858: abort (abort.c:79)
+==14672==    by 0x48F93ED: __libc_message (libc_fatal.c:155)
+==14672==    by 0x499BB49: __fortify_fail (fortify_fail.c:26)
+==14672==    by 0x499BB15: __stack_chk_fail (stack_chk_fail.c:24)
+==14672==    by 0x1091F8: main
+==14672== 
+==14672== HEAP SUMMARY:
+==14672==     in use at exit: 0 bytes in 0 blocks
+==14672==   total heap usage: 1 allocs, 1 frees, 1,024 bytes allocated
+==14672== 
+==14672== All heap blocks were freed -- no leaks are possible
+==14672== 
+==14672== ERROR SUMMARY: 0 errors from 0 contexts 
+Annullato (core dump creato)
+\end{lstlisting}
+
+In caso di stack smashing, l'esecuzione del programma viene interrotta ma
+Valgrind gestine in maniera robusta il fallimento e termina correttamente
+mostrando lo stacktrace che ha portato alla generazione del fallimento.
 
 %----------------------------------------------------------------------------------------
 %	SECTION 5
 %----------------------------------------------------------------------------------------
 
+\newpage
 \section{Casi studio complessi}
 
 \subsection{Esempio 1}

@@ -6,3 +6,4 @@ report/*.blg
 report/*.fdb_latexmk
 report/*.fls
 report/*.toc
+a.out
