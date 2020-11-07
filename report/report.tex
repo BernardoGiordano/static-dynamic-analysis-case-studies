@@ -317,7 +317,29 @@ funzioni chiamate per raggiungere quella riga. Memcheck tiene traccia
 dell'indirizzabilità a livello di byte e dell'inizializzazione dei valori a
 livello di bit. Di conseguenza, è in grado di rilevare l'uso di singoli bit non
 inizializzati.
-Memcheck esegue programmi circa 10-30 volte più lentamente del normale.
+Memcheck esegue programmi circa 10-30 volte più lentamente del normale. \\
+
+Gli errori precedentemente menzionati vengono solo segnalati da Memcheck, che
+non impedisce la loro generazione. Se un programma esegue un accesso alla
+memoria che genera un errore di segmentazione, questo errore si verificherà anche se
+si utilizza Memcheck. Detto questo, Memcheck registrerà un messaggio
+immediatamente prima dell'errore. \\
+
+Memcheck fornisce diverse opzioni a riga di comando per rendere l'analisi più flessibile. Alcune di queste opzioni sono:
+
+\begin{description}
+    \item[\texttt{--leak-check}] Se abilitato Memcheck va alla ricerca di perdite di memoria
+    quando il programma termina la sua esecuzione. Il valore predefinito è
+    \texttt{summary}, e il suo output riporta il numero di perdite trovate. Altri valori
+    possibili sono \texttt{yes} e \texttt{full}, entrambi riportano le informazioni su ogni perdita
+    individuale e \texttt{no} disabilita questo tipo di controllo.
+
+    \item[\texttt{--undef-value-errors}] Se abilitato (impostato su \texttt{yes}), Memcheck riporta gli errori se vengono
+    usati valori non identificati. Se disabilitato (impostato su \texttt{no}), questi
+    errori non vengono riportati. Questa opzione è abilitata per impostazione
+    predefinita. La sua disabilitazione aumenta leggermente la velocità di
+    esecuzione di Memcheck.
+\end{description}
 
 \subsubsection{Cachegrind}
 
@@ -328,6 +350,34 @@ memoria e istruzioni eseguite per ogni riga di codice sorgente, con riepiloghi
 per funzione, per modulo e per l'intero programma. È utilizzabile con programmi scritti
 in qualsiasi linguaggio. Cachegrind esegue i programmi circa 20-100 volte più
 lentamente del normale. \\
+
+Cachegrind è in grado di ottenere le seguenti informazioni per l'intero programma e per ogni funzione presente al suo interno:
+
+\begin{itemize}
+    \item Richieste di lettura non eseguite (read misses) e lettura (o
+    istruzioni eseguite) delle istruzioni per cache del primo livello, e
+    richieste di lettura non eseguite per le istruzioni della cache dell'ultimo livello.
+    \item Lettura dati della cache (o lettura della memoria), richieste di lettura non eseguite.
+    \item Scrittura dati della cache (o scrittura della memoria), richieste di scrittura non eseguite.
+    \item Branch condizionali eseguiti e previsti incorrettamente.
+    \item Branch indiretti eseguiti e previsti incorrettamente.
+\end{itemize}
+
+Per impostazione predefinita Cachegrind stampa un sommario delle informazioni
+relative alle statistiche sopra riportate, e scrive in modo più dettagliato le
+informazioni sul profiling su un file (\texttt{cachegrind.out.pid}, dove \texttt{pid} è l'ID del
+processo del programma sul quale è stato eseguito Cachegrind). \\
+
+Alcune opzioni da riga di comando per rendere l'analisi più flessibile sono le
+seguenti:
+
+\begin{description}
+    \item[\texttt{--cache-sim}] Abilita o disabilita la raccolta dei conteggi relativi al mancato accesso e dell'accesso della cache. Il valore predefinito è \texttt{yes} (abilitato).
+    \item[\texttt{--branch-sim}] Abilita o disabilita la raccolta delle informazioni relative ai conteggi
+    previsti incorrettamente e sulle istruzioni del branch. Per impostazione
+    predefinita questa opzione è impostata su \texttt{no} (disabilitato), poichè
+    rallenterà Cachegrind di circa il 25 per cento. 
+\end{description}
 
 Callgrind è un tool aggiuntivo che nasce come estensione di Cachegrind, che
 fornisce informazioni aggiuntive sui call graphs.
@@ -340,7 +390,40 @@ mostra l'utilizzo dell'heap nel tempo, comprese le informazioni su quali parti
 del programma sono responsabili della maggior parte delle allocazioni di
 memoria. Il grafico è integrato da un file di testo o HTML che include ulteriori
 informazioni per determinare dove viene allocata la maggior parte della memoria.
-Massif esegue programmi circa 20 volte più lentamente del normale.
+Massif esegue programmi circa 20 volte più lentamente del normale. \\
+
+I dati sul profiling raccolti da Massif vengono scritti su un file che per
+impostazione predefinita viene chiamato \texttt{massif.out.pid}, dove \texttt{pid} è l'ID del processo del programma specificato.
+Questi dati possono essere rappresentati in modo grafico con il comando \texttt{ms\_print}.
+
+\begin{lstlisting}[language=bash]
+ms_print massif.out.pid
+\end{lstlisting}
+
+Così facendo verrà generato un grafico sul consumo della memoria relativa
+all'esecuzione del programma. \\
+
+Massif fornisce un certo numero di opzioni della linea di comando utilizzabili.
+Alcune opzioni disponibili sono: 
+
+\begin{description}
+    \item[\texttt{--heap}] Specifica se eseguire il profiling di heap. Il valore predefinito è \texttt{yes}. Il profiling di heap può essere disabilitato impostando questa opzione su \texttt{no}. 
+    \item[\texttt{--heap-admin}] Specifica il numero di byte per blocco da usare per la gestione quando il profiling di heap è abilitato. Il valore predefinito è 8 byte per blocco.
+    \item[\texttt{--stacks}] Specifica se eseguire il profiling dello stack. Il
+    valore predefinito è \texttt{no} (disabilitato). Per abilitare il profiling
+    dello stack bisogna impostare questa opzione su yes, ma in questo modo verrà sensibilmente rallentata l'esecuzione di Massif. Da
+    notare che Massif assume che la dimensione dello stack sia zero
+    all'avvio.
+    \item[\texttt{--time-unit}] Specifica l'unità di tempo usata per il profiling. Sono disponibili tre
+    valori validi per questa opzione: istruzioni eseguite (\texttt{i}), il valore
+    predefinito, che risulta utile in numerosi casi; real time (\texttt{ms}, in
+    millisecondi), utile in determinate situazioni; e byte allocati/deallocati
+    sull'heap/o stack (\texttt{B}), utile per programmi eseguiti brevemente e per
+    l'esecuzione di test, poichè questo processo risulta essere quello più
+    facilmente riproducibile su diverse macchine. Questa opzione è utile per un
+    grafico dell'output di Massif con \texttt{ms\_print}. 
+\end{description}
+
 
 \subsubsection{Helgrind}
 
