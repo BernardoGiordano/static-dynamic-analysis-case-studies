@@ -1,7 +1,6 @@
 \documentclass{article}
 
 \usepackage{graphicx}
-\usepackage{natbib}
 \usepackage{listings}
 \usepackage{polyglossia}
 \setdefaultlanguage{italian}
@@ -21,6 +20,12 @@
 \begin{document}
 \maketitle
 
+\newpage
+
+\tableofcontents
+
+\newpage
+
 %----------------------------------------------------------------------------------------
 %	SECTION 1
 %----------------------------------------------------------------------------------------
@@ -31,7 +36,7 @@
 \label{sec:obiettivo}
 
 L'obiettivo dell'assignment è quello di approfondire le tecniche di analisi
-statica e dinamica del codice \texttt{C}/\texttt{C++} per scoprire problemi relativi allo
+statica e dinamica del codice \texttt{C/C++} per scoprire problemi relativi allo
 scorretto utilizzo della memoria, come ad esempio mancata deallocazione (memory
 leak), accesso a locazioni di memoria non valide e undefined behaviour.
 
@@ -102,15 +107,55 @@ l'esecuzione di un programma su un processore reale o virtuale. \\
 Ci sono diverse tipologie di analisi dinamica:
 
 \begin{itemize}
-    \item Code coverage:
-    \item Memory error detection:
-    \item Fault localization:
-    \item Concurrency errors:
-    \item Performance analysis:
+    \item Code coverage: serve a misurare il grado di utilizzo del codice
+    sorgente di un programma quando viene eseguita una particolare test suite
+    \item Memory error detection: serve a identificare problemi dovuti alla
+    mancata deallocazione dinamica di memoria e a memory leaks.
+    \item Fault localization: serve a localizzare bugs nel codice basandosi sui
+    casi di test passati o falliti.
+    \item Concurrency errors detection: serve a identificare condizioni di
+    corsa, eccezioni e deadlock in codice multithread o concorrente.
+    \item Performance analysis: il programma in esecuzione viene analizzato per
+    identificare eventuali problemi prestazionali.
 \end{itemize}
 
 \subsection{Aging}
 \label{sec:aging}
+
+Con l'aging del software si fa riferimento alla tendenza dei software di
+fallire, o di causare fallimenti del sistema complessivo in cui operano, quando
+sono eseguiti continuamente per un certo intervallo di tempo. I fattori che
+causano l'aging del software sono il memory bloating e il memory leaking, la
+corruzione dei dati in memoria e il mancato rilascio di risorse richieste al
+sistema operativo come gli handler dei file e delle socket. \\
+
+Una tecnica proattiva per contrastare l'aging è la \emph{software rejuvenation},
+che consiste nel rimuovere condizioni accumulate che possono portare ad errore,
+anche semplicemente riavviando il software o la macchina sulla quale esso
+opera. \\
+
+Tra le cause principali dietro l'aging del software, troviamo il \emph{memory
+leak}. Ogni qual volta un software in esecuzione su un sistema operativo deve
+effettuare delle operazioni, esso deve richiedere blocchi di memoria per
+allocare eventuali variabili e strutture dati. Quando il software termina la
+propria esecuzione, il sistema operativo si aspetta che il programma abbia
+liberato completamente la memoria richiesta all'avvio e durante l'esecuzione
+(variabili allocate, rispettivamente, staticamente e dinamicamente). Nei
+linguaggi di programmazione che prevedono un garbage collector (e.g. Java)
+l'allocazione dinamica della memoria non è direttamente consentita al
+programmatore e la memoria viene automaticamente liberata da un garbage
+collector, che ha memoria dei riferimenti che vengono fatti ad una particolare
+locazione di memoria; quando essa non viene più utilizzata dal programma, viene
+liberata. In altri linguaggi come invece il C o il C++, che non hanno a
+disposizione un garbage collector (in quanto, ad esempio, a differenza del Java
+non operano sotto una Virtual Machine), la mancata deallocazione di memoria da
+parte del programmatore può causare memory leaks. \\
+
+È quindi importante, in fase di sviluppo, prestare la dovuta attenzione alle
+allocazioni e alle deallocazioni di memoria e al suo utilizzo. Vengono incontro
+a questo scopo dei tool come Cppcheck e Valgrind che sono di supporto in fase di
+sviluppo per effettuare analisi statica e dinamica volta all'identificazione di
+utilizzo scorretto della memoria.
  
 %----------------------------------------------------------------------------------------
 %	SECTION 2
@@ -121,11 +166,70 @@ Ci sono diverse tipologie di analisi dinamica:
 \subsection{Panoramica}
 \label{sec:cppcheck:panoramica}
 
+Cppcheck è un tool per l'analisi statica di codice C e C++. Esso si concentra
+sull'identificazione di undefined behaviour, utilizzo scorretto delle risorse e
+costrutti potenzialmente pericolosi. Cppcheck è fatto in modo tale da avere un
+numero di falsi positivi molto basso anche in condizioni di codice con sintassi
+non standard e customizzata (situazione comune nei sistemi embedded).
+
 \subsection{Installazione}
 \label{sec:cppcheck:installazione}
 
+Cppcheck può essere installato in semplicemente da un repository
+che lo contiene, oppure direttamente da pacchetto. Ad esempio, su
+una distribuzione Debian/Ubuntu: \\
+
+\begin{lstlisting}[language=bash]
+sudo apt install cppcheck
+\end{lstlisting}
+
 \subsection{Funzionalità}
 \label{sec:cppcheck:funzionalita}
+
+Cppcheck possiede una interfaccia grafica e una a riga di comando, a seconda
+delle esigenze dell'utilizzatore. Per questo assignment, ci si concentrerà
+sull'utilizzo tramite \emph{command line interface}. \\
+
+Cppcheck è progettato affinché la data flow analysis sia \emph{bidirezionale} e non
+solo \emph{forward}, come avviene per altri tool analoghi. Questo significa che
+Cppcheck è in grado di diagnosticare problemi che altri tool non evidenziano.
+Molti tool di analisi statica evidenzieranno questo problema di overflow della memoria:
+
+\begin{lstlisting}[language=c]
+void foo(int x) {
+    int buf[10];
+    if (x == 1000)
+        buf[x] = 0; // <- ERRORE
+}
+\end{lstlisting}
+
+Altri tool invece è in grado di diagnosticare anche problemi di overflow come il
+seguente, che comportano undefined behaviour:
+
+\begin{lstlisting}[language=c]
+void foo(int x) {
+    int buf[10];
+    buf[x] = 0; // <- UNDEFINED BEHAVIOUR SE x >= 10
+    if (x == 1000) {}
+}
+\end{lstlisting}
+
+Altri esempi di undefined behaviour che Cppcheck riesce ad identificare sono i
+seguenti:
+
+\begin{itemize}
+    \item Dead pointers
+    \item Divisione per zero
+    \item Integer overflows
+    \item Operandi di bit shift invalidi
+    \item Conversioni invalide
+    \item Utilizzo scorretto della Standard Library
+    \item Gestione della memoria
+    \item Null pointer dereferences
+    \item Controllo degli indici \emph{out of bounds}
+    \item Uso di variabili non inizializzate
+    \item Scrittura su costanti
+\end{itemize}
 
 %----------------------------------------------------------------------------------------
 %	SECTION 3
@@ -166,8 +270,8 @@ generalmente consigliato ricompilare l'applicazione in modalità di debug.
 \subsection{Installazione}
 \label{sec:valgrind:installazione}
 
-Il framework Valgrind può essere installato in maniera semplice da un repository
-che lo contiene, oppure installandolo direttamente da pacchetto. Ad esempio, su
+Il framework Valgrind può essere installato in semplicemente da un repository
+che lo contiene, oppure direttamente da pacchetto. Ad esempio, su
 una distribuzione Debian/Ubuntu: \\
 
 \begin{lstlisting}[language=bash]
@@ -184,6 +288,86 @@ dove \texttt{toolname} è il nome dello strumento di Valgrind desiderato, e
 
 \subsection{Funzionalità}
 \label{sec:valgrind:funzionalita}
+
+La suite Valgrind contiene al suo interno un vasto assortimento di strumenti di
+debugging e profiling.
+
+\subsubsection{Memcheck}
+
+Memcheck rileva i problemi di gestione della memoria ed è
+rivolto principalmente ai programmi C e C++. Quando un programma viene eseguito
+sotto la supervisione di Memcheck, tutte le letture e le scritture della memoria
+vengono controllate e le chiamate a \texttt{malloc}, \texttt{new}, \texttt{free}
+e \texttt{delete} vengono intercettate. Di conseguenza, Memcheck può rilevare se
+il programma:
+
+\begin{itemize}
+    \item Accede a memoria che non dovrebbe (aree non ancora allocate, aree che
+    sono state liberate, aree oltre la fine dei blocchi di heap, aree inaccessibili dello stack).
+    \item Utilizza valori non inizializzati.
+    \item Perde memoria.
+    \item Esegue liberazioni errate di blocchi di heap (double free).
+    \item Passa blocchi di memoria di origine e destinazione sovrapposti a \texttt{memcpy}
+    e alle funzioni correlate.
+\end{itemize}
+
+Memcheck segnala questi errori non appena si verificano, fornendo il numero di
+riga di origine in cui si è verificato e anche una traccia dello stack delle
+funzioni chiamate per raggiungere quella riga. Memcheck tiene traccia
+dell'indirizzabilità a livello di byte e dell'inizializzazione dei valori a
+livello di bit. Di conseguenza, è in grado di rilevare l'uso di singoli bit non
+inizializzati.
+Memcheck esegue programmi circa 10-30 volte più lentamente del normale.
+
+\subsubsection{Cachegrind}
+
+Cachegrind è un profiler della cache. Esegue una simulazione dettagliata delle
+cache L1 ed L2 nella CPU e quindi può individuare con precisione le fonti di
+\emph{cache miss} nel codice. Identifica il numero di cache miss, riferimenti di
+memoria e istruzioni eseguite per ogni riga di codice sorgente, con riepiloghi
+per funzione, per modulo e per l'intero programma. È utilizzabile con programmi scritti
+in qualsiasi linguaggio. Cachegrind esegue i programmi circa 20-100 volte più
+lentamente del normale. \\
+
+Callgrind è un tool aggiuntivo che nasce come estensione di Cachegrind, che
+fornisce informazioni aggiuntive sui call graphs.
+
+\subsubsection{Massif}
+
+Massif è un profiler della memoria heap. Esegue una profilazione dettagliata dell'heap
+acquisendo istantanee regolari dell'heap di un programma. Produce un grafico che
+mostra l'utilizzo dell'heap nel tempo, comprese le informazioni su quali parti
+del programma sono responsabili della maggior parte delle allocazioni di
+memoria. Il grafico è integrato da un file di testo o HTML che include ulteriori
+informazioni per determinare dove viene allocata la maggior parte della memoria.
+Massif esegue programmi circa 20 volte più lentamente del normale.
+
+\subsubsection{Helgrind}
+
+Helgrind è un debugger di thread che trova race conditions in programmi
+multithread. Cerca le posizioni di memoria a cui si accede da più di un thread
+(POSIX o pthread), ma per le quali non è possibile trovare alcun blocco
+utilizzato in modo coerente. Tali posizioni sono indicative
+della mancata sincronizzazione tra i thread e potrebbero causare problemi
+dipendenti dalla temporizzazione altrimenti difficili da trovare. È utile per qualsiasi
+programma che utilizza i pthreads.
+
+\subsubsection{DRD}
+
+DRD è uno strumento per rilevare errori nei programmi C e C++ multithread. Lo
+strumento funziona per qualsiasi programma che utilizza le primitive di
+threading POSIX o che utilizza concetti di threading costruiti sopra le
+primitive di threading POSIX. Sebbene Helgrind possa rilevare le violazioni
+dell'ordine di blocco, per la maggior parte dei programmi DRD necessita di meno
+memoria per eseguire la sua analisi, e quindi può essere considerato come
+un'alternativa.
+
+\subsubsection{DHAT}
+
+DHAT è uno strumento per esaminare come i programmi utilizzano le allocazioni di
+heap. Tiene traccia dei blocchi allocati e ispeziona ogni accesso alla memoria
+per trovare quale blocco deve essere allocato. Viene fornito con una GUI per
+facilitare l'esplorazione dei risultati di profiling.
 
 %----------------------------------------------------------------------------------------
 %	SECTION 4
@@ -217,14 +401,5 @@ dove \texttt{toolname} è il nome dello strumento di Valgrind desiderato, e
 %----------------------------------------------------------------------------------------
 
 \section{Conclusioni}
-
-%----------------------------------------------------------------------------------------
-%	BIBLIOGRAPHY
-%----------------------------------------------------------------------------------------
-
-\bibliography{biblio}
-
-%----------------------------------------------------------------------------------------
-
 
 \end{document}

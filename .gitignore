@@ -1,3 +1,8 @@
 report/*.aux
 report/*.log
 report/*.pdf
+report/*.bbl
+report/*.blg
+report/*.fdb_latexmk
+report/*.fls
+report/*.toc
