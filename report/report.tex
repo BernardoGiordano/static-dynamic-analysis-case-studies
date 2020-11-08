@@ -1,5 +1,5 @@
 \documentclass{article}
-
+\usepackage[margin=3cm]{geometry}
 \usepackage{graphicx}
 \usepackage{listings}
 \usepackage{polyglossia}
@@ -461,6 +461,97 @@ facilitare l'esplorazione dei risultati di profiling.
 
 \subsection{Caso 1}
 \label{sec:caso1}
+
+\begin{lstlisting}[language=c]
+#include <stdlib.h>
+#include <stdio.h>
+
+int main() {
+    int* buffer1 = malloc(100 * sizeof(int));
+    int* buffer2 = malloc(100 * sizeof(int));
+
+    int a = buffer1[0];
+    int b = buffer1[102];
+
+    free(buffer1);
+
+    int c = buffer1[0];
+    printf("%d\n", c);
+
+    return 0;
+}
+\end{lstlisting}
+
+Questo codice effettua due allocazioni dinamiche di 400 byte ciascuna, dopodiché
+effettua una \emph{out of bounds read} per definire la variabile \texttt{b}.
+Successivamente \texttt{buffer1} viene deallocato con una \texttt{free} e viene
+nuovamente letto per definire la variabile \texttt{c}. Infine, \texttt{buffer2}
+non viene mai deallocato. \\
+
+Eseguendo Cppcheck:
+
+\begin{lstlisting}[language=bash]
+$ cppcheck main.c 
+Checking main.c ...
+main.c:9:20: error: Array 'buffer1[100]' accessed at index 102, which is out of bounds. [arrayIndexOutOfBounds]
+    int b = buffer1[102];
+                   ^
+main.c:13:13: error: Dereferencing 'buffer1' after it is deallocated / released [deallocuse]
+    int c = buffer1[0];
+            ^
+main.c:16:5: error: Memory leak: buffer2 [memleak]
+    return 0;
+    ^
+\end{lstlisting}
+
+Eseguendo Valgrind:
+
+\begin{lstlisting}[language=bash]
+$ valgrind -s --leak-check=full ./a.out 
+==6545== Memcheck, a memory error detector
+...
+==6545== HEAP SUMMARY:
+==6545==     in use at exit: 400 bytes in 1 blocks
+==6545==   total heap usage: 3 allocs, 2 frees, 1,824 bytes allocated
+==6545== 
+==6545== 400 bytes in 1 blocks are definitely lost in loss record 1 of 1
+==6545==    at 0x483B7F3: malloc 
+==6545==    by 0x1091AC: main 
+==6545== 
+==6545== LEAK SUMMARY:
+==6545==    definitely lost: 400 bytes in 1 blocks
+==6545==    indirectly lost: 0 bytes in 0 blocks
+==6545==      possibly lost: 0 bytes in 0 blocks
+==6545==    still reachable: 0 bytes in 0 blocks
+==6545==         suppressed: 0 bytes in 0 blocks
+==6545== 
+==6545== ERROR SUMMARY: 3 errors from 3 contexts (suppressed: 0 from 0)
+==6545== 
+==6545== 1 errors in context 1 of 3:
+==6545== Invalid read of size 4
+==6545==    at 0x1091D7: main 
+==6545==  Address 0x4a5e040 is 0 bytes inside a block of size 400 free'd
+==6545==    at 0x483CA3F: free 
+==6545==    by 0x1091D2: main 
+==6545==  Block was alloc'd at
+==6545==    at 0x483B7F3: malloc 
+==6545==    by 0x10919E: main 
+==6545== 
+==6545== 
+==6545== 1 errors in context 2 of 3:
+==6545== Invalid read of size 4
+==6545==    at 0x1091BE: main 
+==6545==  Address 0x4a5e1d8 is 8 bytes after a block of size 400 alloc'd
+==6545==    at 0x483B7F3: malloc 
+==6545==    by 0x10919E: main 
+==6545== 
+==6545== ERROR SUMMARY: 3 errors from 3 contexts (suppressed: 0 from 0)
+\end{lstlisting}
+
+Cppcheck riconosce i tre errori previsti. Valgrind non riconosce la lettura
+successiva alla deallocazione della memoria. In compenso, fornisce una analisi
+dettagliata dell'utilizzo della memoria, restituendo gli indirizzi invalidi e
+l'ammontare di heap che non è stato liberato (400 bytes come previsto).
 
 \newpage
 \subsection{Caso 2}
