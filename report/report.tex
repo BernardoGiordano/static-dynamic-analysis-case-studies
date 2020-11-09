@@ -2,6 +2,7 @@
 \usepackage[margin=3cm]{geometry}
 \usepackage{graphicx}
 \usepackage{listings}
+\usepackage{dirtree}
 \usepackage{polyglossia}
 \setdefaultlanguage{italian}
 \setotherlanguages{english}
@@ -459,7 +460,7 @@ facilitare l'esplorazione dei risultati di profiling.
 \newpage
 \section{Esempi di utilizzo}
 
-\subsection{Caso 1}
+\subsection{Caso 1: memory leak, out of bounds read, read after free, double free}
 \label{sec:caso1}
 
 \begin{lstlisting}[language=c]
@@ -469,37 +470,50 @@ facilitare l'esplorazione dei risultati di profiling.
 int main() {
     int* buffer1 = malloc(100 * sizeof(int));
     int* buffer2 = malloc(100 * sizeof(int));
+    int* buffer3 = malloc(100 * sizeof(int));
 
     int a = buffer1[0];
     int b = buffer1[102];
 
     free(buffer1);
+    free(buffer3);
 
     int c = buffer1[0];
     printf("%d\n", c);
 
+    free(buffer3);
     return 0;
 }
 \end{lstlisting}
 
-Questo codice effettua due allocazioni dinamiche di 400 byte ciascuna, dopodiché
+Questo codice effettua tre allocazioni dinamiche di 400 byte ciascuna, dopodiché
 effettua una \emph{out of bounds read} per definire la variabile \texttt{b}.
 Successivamente \texttt{buffer1} viene deallocato con una \texttt{free} e viene
 nuovamente letto per definire la variabile \texttt{c}. Infine, \texttt{buffer2}
-non viene mai deallocato. \\
+non viene mai deallocato. \texttt{buffer3} viene invece deallocato
+scorrettamente due volte. \\
 
 Eseguendo Cppcheck:
 
 \begin{lstlisting}[language=bash]
 $ cppcheck main.c 
 Checking main.c ...
-main.c:9:20: error: Array 'buffer1[100]' accessed at index 102, which is out of bounds. [arrayIndexOutOfBounds]
+main.c:10:20: error: Array 'buffer1[100]' accessed at index 102, which is out of bounds. [arrayIndexOutOfBounds]
     int b = buffer1[102];
                    ^
-main.c:13:13: error: Dereferencing 'buffer1' after it is deallocated / released [deallocuse]
+main.c:15:13: error: Dereferencing 'buffer1' after it is deallocated / released [deallocuse]
     int c = buffer1[0];
             ^
-main.c:16:5: error: Memory leak: buffer2 [memleak]
+main.c:18:5: error: Memory pointed to by 'buffer3' is freed twice. [doubleFree]
+    free(buffer3);
+    ^
+main.c:13:5: note: Memory pointed to by 'buffer3' is freed twice.
+    free(buffer3);
+    ^
+main.c:18:5: note: Memory pointed to by 'buffer3' is freed twice.
+    free(buffer3);
+    ^
+main.c:19:5: error: Memory leak: buffer2 [memleak]
     return 0;
     ^
 \end{lstlisting}
@@ -508,61 +522,217 @@ Eseguendo Valgrind:
 
 \begin{lstlisting}[language=bash]
 $ valgrind -s --leak-check=full ./a.out 
-==6545== Memcheck, a memory error detector
+==11225== Memcheck, a memory error detector
 ...
-==6545== HEAP SUMMARY:
-==6545==     in use at exit: 400 bytes in 1 blocks
-==6545==   total heap usage: 3 allocs, 2 frees, 1,824 bytes allocated
-==6545== 
-==6545== 400 bytes in 1 blocks are definitely lost in loss record 1 of 1
-==6545==    at 0x483B7F3: malloc 
-==6545==    by 0x1091AC: main 
-==6545== 
-==6545== LEAK SUMMARY:
-==6545==    definitely lost: 400 bytes in 1 blocks
-==6545==    indirectly lost: 0 bytes in 0 blocks
-==6545==      possibly lost: 0 bytes in 0 blocks
-==6545==    still reachable: 0 bytes in 0 blocks
-==6545==         suppressed: 0 bytes in 0 blocks
-==6545== 
-==6545== ERROR SUMMARY: 3 errors from 3 contexts (suppressed: 0 from 0)
-==6545== 
-==6545== 1 errors in context 1 of 3:
-==6545== Invalid read of size 4
-==6545==    at 0x1091D7: main 
-==6545==  Address 0x4a5e040 is 0 bytes inside a block of size 400 free'd
-==6545==    at 0x483CA3F: free 
-==6545==    by 0x1091D2: main 
-==6545==  Block was alloc'd at
-==6545==    at 0x483B7F3: malloc 
-==6545==    by 0x10919E: main 
-==6545== 
-==6545== 
-==6545== 1 errors in context 2 of 3:
-==6545== Invalid read of size 4
-==6545==    at 0x1091BE: main 
-==6545==  Address 0x4a5e1d8 is 8 bytes after a block of size 400 alloc'd
-==6545==    at 0x483B7F3: malloc 
-==6545==    by 0x10919E: main 
-==6545== 
-==6545== ERROR SUMMARY: 3 errors from 3 contexts (suppressed: 0 from 0)
+==11225== HEAP SUMMARY:
+==11225==     in use at exit: 400 bytes in 1 blocks
+==11225==   total heap usage: 4 allocs, 4 frees, 2,224 bytes allocated
+==11225== 
+==11225== 400 bytes in 1 blocks are definitely lost in loss record 1 of 1
+==11225==    at 0x483B7F3: malloc 
+==11225==    by 0x1091AC: main 
+==11225== 
+==11225== LEAK SUMMARY:
+==11225==    definitely lost: 400 bytes in 1 blocks
+==11225==    indirectly lost: 0 bytes in 0 blocks
+==11225==      possibly lost: 0 bytes in 0 blocks
+==11225==    still reachable: 0 bytes in 0 blocks
+==11225==         suppressed: 0 bytes in 0 blocks
+==11225== 
+==11225== ERROR SUMMARY: 4 errors from 4 contexts (suppressed: 0 from 0)
+==11225== 
+==11225== 1 errors in context 1 of 4:
+==11225== Invalid free() / delete / delete[] / realloc()
+==11225==    at 0x483CA3F: free 
+==11225==    by 0x109217: main 
+==11225==  Address 0x4a5e3e0 is 0 bytes inside a block of size 400 free'd
+==11225==    at 0x483CA3F: free 
+==11225==    by 0x1091EC: main 
+==11225==  Block was alloc'd at
+==11225==    at 0x483B7F3: malloc 
+==11225==    by 0x1091BA: main 
+==11225== 
+==11225== 
+==11225== 1 errors in context 2 of 4:
+==11225== Invalid read of size 4
+==11225==    at 0x1091F1: main 
+==11225==  Address 0x4a5e040 is 0 bytes inside a block of size 400 free'd
+==11225==    at 0x483CA3F: free 
+==11225==    by 0x1091E0: main 
+==11225==  Block was alloc'd at
+==11225==    at 0x483B7F3: malloc 
+==11225==    by 0x10919E: main 
+==11225== 
+==11225== 
+==11225== 1 errors in context 3 of 4:
+==11225== Invalid read of size 4
+==11225==    at 0x1091CC: main 
+==11225==  Address 0x4a5e1d8 is 8 bytes after a block of size 400 alloc'd
+==11225==    at 0x483B7F3: malloc 
+==11225==    by 0x10919E: main 
+==11225== 
+==11225== ERROR SUMMARY: 4 errors from 4 contexts (suppressed: 0 from 0)
 \end{lstlisting}
 
-Cppcheck riconosce i tre errori previsti. Valgrind non riconosce la lettura
+Cppcheck riconosce gli errori previsti compreso il double free. Valgrind non riconosce la lettura
 successiva alla deallocazione della memoria. In compenso, fornisce una analisi
 dettagliata dell'utilizzo della memoria, restituendo gli indirizzi invalidi e
 l'ammontare di heap che non è stato liberato (400 bytes come previsto).
 
 \newpage
-\subsection{Caso 2}
+\subsection{Caso 2: memory leak, allocation/deallocation mismatching}
 \label{sec:caso2}
 
-\newpage
-\subsection{Caso 3}
-\label{sec:caso3}
+\begin{lstlisting}[language=c++]
+#include <stdlib.h>
+
+class Foo {
+private:
+    char* str1;
+    char* str2;
+    char* str3;
+public:
+    Foo();
+    ~Foo();
+};
+Foo::Foo() {
+    str1 = new char[10];
+    str2 = new char[10];
+    str3 = new char[10];
+}
+Foo::~Foo() {
+    free(str1);
+    delete[] str2;
+}
+
+int main() {
+    Foo* bar = new Foo();
+    delete bar;
+    return 0;
+}
+\end{lstlisting}
+
+Questo programma C++ mostra una classe con tre attributi di tipo puntatore a
+carattere, che vengono allocati dinamicamente nel costruttore con una
+\texttt{new}. \\
+Il distruttore dealloca correttamente \texttt{str2}, non dealloca affatto
+\texttt{str1} ed effettua la deallocazione di \texttt{str1} con la funzione
+sbagliata (\texttt{free} invece di \texttt{delete}). \\
+
+Eseguendo Cppcheck, viene evidenziato solo l'errore di programmazione relativo
+all'errore in fase di deallocazione di \texttt{str1}. Non viene quindi
+evidenziato il memory leak su \texttt{str3}.
+
+\begin{lstlisting}[language=bash]
+$ cppcheck main.cpp 
+Checking main.cpp ...
+main.cpp:20:5: error: Mismatching allocation and deallocation: Foo::str1 [mismatchAllocDealloc]
+    free(str1);
+    ^
+\end{lstlisting}
+
+Eseguendo Valgrind:
+
+\begin{lstlisting}[language=bash]
+$ valgrind -s --leak-check=full ./a.out 
+==8222== Memcheck, a memory error detector
+...
+==8222== HEAP SUMMARY:
+==8222==     in use at exit: 10 bytes in 1 blocks
+==8222==   total heap usage: 5 allocs, 4 frees, 72,758 bytes allocated
+==8222== 
+==8222== 10 bytes in 1 blocks are definitely lost in loss record 1 of 1
+==8222==    at 0x483C583: operator new[](unsigned long) 
+==8222==    by 0x10922C: Foo::Foo() 
+==8222==    by 0x10929E: main 
+==8222== 
+==8222== LEAK SUMMARY:
+==8222==    definitely lost: 10 bytes in 1 blocks
+==8222==    indirectly lost: 0 bytes in 0 blocks
+==8222==      possibly lost: 0 bytes in 0 blocks
+==8222==    still reachable: 0 bytes in 0 blocks
+==8222==         suppressed: 0 bytes in 0 blocks
+==8222== 
+==8222== ERROR SUMMARY: 2 errors from 2 contexts (suppressed: 0 from 0)
+==8222== 
+==8222== 1 errors in context 1 of 2:
+==8222== Mismatched free() / delete / delete []
+==8222==    at 0x483CA3F: free 
+==8222==    by 0x10925A: Foo::~Foo() 
+==8222==    by 0x1092B3: main 
+==8222==  Address 0x4dbcce0 is 0 bytes inside a block of size 10 alloc'd
+==8222==    at 0x483C583: operator new[](unsigned long) 
+==8222==    by 0x109203: Foo::Foo() 
+==8222==    by 0x10929E: main 
+==8222== 
+==8222== ERROR SUMMARY: 2 errors from 2 contexts (suppressed: 0 from 0)
+\end{lstlisting}
+
+Valgrind evidenzia correttamente entrambi gli errori presenti nel codice,
+mostrando quindi anche il fatto che 10 bytes si siano persi perché mai
+deallocati. \\
+Interessante notare come per questo programma molto semplice, nel quale vengono
+allocati esplicitamente solo 30 bytes, ne vengono in realtà allocati
+complessivamente 72758 dalle routine interne di C++, per poi venire deallocati. 
 
 \newpage
-\subsection{Caso 4}
+\subsection{Caso 3: memory leak causato dal cattivo uso di \texttt{realloc}}
+\label{sec:caso3}
+
+\begin{lstlisting}[language=c]
+#include <stdio.h>
+#include <stdlib.h>
+
+void foo() {
+    static char* buf = 0;
+    if ((buf = realloc(buf, 100)) == NULL)
+        return;
+    free(buf);
+}
+
+int main() {
+    foo();
+    return 0;
+}
+\end{lstlisting}
+
+Questo programma presenta un memory leak in quanto in caso di fallimento
+di \texttt{realloc}, il puntatore di \texttt{buf} verrà settato a \texttt{NULL}
+ma la memoria non sarà rilasciata.
+
+Eseguendo cppcheck:
+
+\begin{lstlisting}[language=bash]
+$ cppcheck main.c
+Checking main.c ...
+main.c:6:10: error: Common realloc mistake: 'buf' nulled but not freed upon failure [memleakOnRealloc]
+    if ((buf = realloc(buf, 100)) == NULL)
+         ^
+\end{lstlisting}
+
+Eseguendo Valgrind, invece, l'errore viene riconosciuto solo quando
+\texttt{realloc} effettivamente fallisce. In questa esecuzione infatti, esso non
+viene riconosciuto.
+
+\begin{lstlisting}[language=bash]
+$ valgrind -s --leak-check=full ./a.out 
+==7348== Memcheck, a memory error detector
+...
+==7348== HEAP SUMMARY:
+==7348==     in use at exit: 0 bytes in 0 blocks
+==7348==   total heap usage: 1 allocs, 1 frees, 100 bytes allocated
+==7348== 
+==7348== All heap blocks were freed -- no leaks are possible
+==7348== 
+==7348== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
+\end{lstlisting}
+
+Con questo esempio si evidenzia l'importanza dell'esecuzione dell'analisi
+statica, perché problemi simili non sempre vengono riconosciuto immediatamente
+tramite l'analisi dinamica.
+
+\newpage
+\subsection{Caso 4: undefined behaviour}
 \label{sec:caso4}
 
 \begin{lstlisting}[language=c]
@@ -652,6 +822,185 @@ In caso di stack smashing, l'esecuzione del programma viene interrotta ma
 Valgrind gestine in maniera robusta il fallimento e termina correttamente
 mostrando lo stacktrace che ha portato alla generazione del fallimento.
 
+\newpage
+\subsection{Caso 5: memory leak dovuto all'utilizzo scorretto di funzioni di libreria}
+\label{sec:caso5}
+
+\begin{lstlisting}[language=c]
+#include <string.h>
+
+int main() {
+    const char* src = "ASSSC";
+    char* dst = strdup(src);
+    return 0;
+}
+\end{lstlisting}
+
+Questo semplice programma duplica una stringa di caratteri utilizzando la
+funzione di libreria \texttt{strdup}. Questa funzione alloca internamente (e dinamicamente) la
+memoria necessaria a contenere la copia della stringa sorgente (quindi in questo
+caso 5 caratteri più un carattere terminatore), ma non la dealloca, perché è un
+compito che spetta al programmatore. In questo programma la memoria non viene
+deallocata esplicitamente con una \texttt{free}.
+
+Eseguendo Cppcheck, l'errore non viene evidenziato. \\
+
+Eseguendo Valgrind, l'errore viene evidenziato e il programma indica che sono
+stati persi complessivamente 6 bytes.
+
+\begin{lstlisting}[language=bash]
+$ valgrind -s --leak-check=full ./a.out 
+==8940== Memcheck, a memory error detector
+...
+==8940== HEAP SUMMARY:
+==8940==     in use at exit: 6 bytes in 1 blocks
+==8940==   total heap usage: 1 allocs, 0 frees, 6 bytes allocated
+==8940== 
+==8940== 6 bytes in 1 blocks are definitely lost in loss record 1 of 1
+==8940==    at 0x483B7F3: malloc 
+==8940==    by 0x490B50E: strdup (strdup.c:42)
+==8940==    by 0x10916B: main 
+==8940== 
+==8940== LEAK SUMMARY:
+==8940==    definitely lost: 6 bytes in 1 blocks
+==8940==    indirectly lost: 0 bytes in 0 blocks
+==8940==      possibly lost: 0 bytes in 0 blocks
+==8940==    still reachable: 0 bytes in 0 blocks
+==8940==         suppressed: 0 bytes in 0 blocks
+==8940== 
+==8940== ERROR SUMMARY: 1 errors from 1 contexts (suppressed: 0 from 0)
+\end{lstlisting}
+
+\newpage
+\subsection{Caso 6: null pointer dereference}
+\label{sec:caso6}
+
+\begin{lstlisting}[language=c++]
+int main() {
+    char* c = (char*)"ASSSC";
+    char* d = 0;
+    /* ... codice ... */
+    delete c;
+    delete d;
+    c[0] = 0;
+    d[0] = 0;
+    return 0;
+}
+\end{lstlisting}
+
+In questo programma C++ vengono definite due stringhe di caratteri, una che
+punta ad un valore costante e una a \texttt{nullptr}. Si suppone che ci sia del
+codice utile prima delle \texttt{delete}. \texttt{delete c;} è una operazione
+scorretta in quanto il valore di \texttt{c} viene assegnato nello stack nella
+prima riga del main. Si suppone che per \texttt{d} il valore venga assegnato
+dinamicamente nel codice omesso per brevità. Il programma successivamente tenta
+di effettuare due scritture su \texttt{c} e \texttt{d}, causando una null
+pointer dereference. 
+
+Eseguendo Cppcheck, viene evidenziata la null pointer dereference su \texttt{d}.
+Viene inoltre segnalato un undefined behaviour, in quanto non è una \emph{best
+practice} modificare direttamente o indirettamente il valore di una stringa
+nella maniera adottata dal programma.
+
+\begin{lstlisting}[language=bash]
+$ cppcheck main.cpp 
+Checking main.cpp ...
+main.cpp:8:5: error: Null pointer dereference: d [nullPointer]
+    d[0] = 0;
+    ^
+main.cpp:3:15: note: Assignment 'd=0', assigned value is 0
+    char* d = 0;
+              ^
+main.cpp:2:22: error: Modifying string literal "ASSSC" directly or indirectly is undefined behaviour. [stringLiteralWrite]
+    char* c = (char*)"ASSSC";
+                     ^
+main.cpp:7:5: note: Modifying string literal "ASSSC" directly or indirectly is undefined behaviour.
+    c[0] = 0;
+    ^
+\end{lstlisting}
+
+Eseguendo Valgrind, viene segnalata l'operazione di \texttt{delete} scorretta
+effettuata sulla variabile \texttt{c}, che non si trova nell'heap.
+
+\begin{lstlisting}[language=bash]
+$ valgrind -s --leak-check=full ./a.out 
+==9894== Memcheck, a memory error detector
+...
+==9894== HEAP SUMMARY:
+==9894==     in use at exit: 0 bytes in 0 blocks
+==9894==   total heap usage: 1 allocs, 2 frees, 72,704 bytes allocated
+==9894== 
+==9894== All heap blocks were freed -- no leaks are possible
+==9894== 
+==9894== ERROR SUMMARY: 1 errors from 1 contexts (suppressed: 0 from 0)
+==9894== 
+==9894== 1 errors in context 1 of 1:
+==9894== Invalid free() / delete / delete[] / realloc()
+==9894==    at 0x483D1CF: operator delete(void*, unsigned long) 
+==9894==    by 0x10917D: main 
+==9894==  Address 0x10a004 is in a r-- mapped file a.out segment
+==9894== 
+==9894== ERROR SUMMARY: 1 errors from 1 contexts (suppressed: 0 from 0)
+\end{lstlisting}
+
+\newpage
+\subsection{Caso 7: resource leak}
+\label{sec:caso7}
+
+\begin{lstlisting}[language=c]
+#include <stdio.h>
+
+int main() {
+    FILE* file = fopen("main.c", "r");
+    if (!file) {
+        /* error handling */
+        return 0;
+    }
+    return 0;
+}
+\end{lstlisting}
+
+Questo programma apre un file e non rilascia l'handler alla risorsa al termine dell'esecuzione, causando un
+resource leak. \\
+
+Cppcheck riconosce correttamente l'errore.
+
+\begin{lstlisting}[language=bash]
+$ cppcheck main.c 
+Checking main.c ...
+main.c:9:5: error: Resource leak: file [resourceLeak]
+    return 0;
+    ^
+\end{lstlisting}
+
+Valgrind riconosce l'errore così come Cppcheck, ma questo non viene
+immediatamente evidenziato se non specificando \texttt{--show-leak-kinds=all}
+come parametro.
+
+\begin{lstlisting}[language=bash]
+$ valgrind -s --leak-check=full --show-leak-kinds=all ./a.out 
+==12959== Memcheck, a memory error detector
+...
+==12959== HEAP SUMMARY:
+==12959==     in use at exit: 472 bytes in 1 blocks
+==12959==   total heap usage: 1 allocs, 0 frees, 472 bytes allocated
+==12959== 
+==12959== 472 bytes in 1 blocks are still reachable in loss record 1 of 1
+==12959==    at 0x483B7F3: malloc 
+==12959==    by 0x48EEAAD: __fopen_internal (iofopen.c:65)
+==12959==    by 0x48EEAAD: fopen@@GLIBC_2.2.5 (iofopen.c:86)
+==12959==    by 0x109167: main 
+==12959== 
+==12959== LEAK SUMMARY:
+==12959==    definitely lost: 0 bytes in 0 blocks
+==12959==    indirectly lost: 0 bytes in 0 blocks
+==12959==      possibly lost: 0 bytes in 0 blocks
+==12959==    still reachable: 472 bytes in 1 blocks
+==12959==         suppressed: 0 bytes in 0 blocks
+==12959== 
+==12959== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
+\end{lstlisting}
+
 %----------------------------------------------------------------------------------------
 %	SECTION 5
 %----------------------------------------------------------------------------------------
@@ -659,8 +1008,96 @@ mostrando lo stacktrace che ha portato alla generazione del fallimento.
 \newpage
 \section{Casi studio complessi}
 
-\subsection{Esempio 1}
-\label{sec:complesso1}
+\subsection{Caso di studio: Checkpoint}
+\label{sec:checkpoint}
+
+Come esempio di software più realistico, scelgo di utilizzare il codice sorgente
+di un mio vecchio software scritto per essere eseguito su piattaforma Nintendo
+3DS e Nintendo Switch, \texttt{Checkpoint}. Checkpoint è un gestore di
+salvataggi che permette estrazione e ripristino da e verso la memoria interna
+della console. Il software è scritto in \texttt{C++} e per praticità si
+proseguirà solo all'analisi statica, in quanto non è possibile eseguire Valgrind
+direttamente sull'hardware destinazione. \\
+
+Entrambi i programmi prevedono l'uso di librerie o sorgenti aggiuntivi di terze parti:
+
+\begin{itemize}
+    \item \texttt{ftp}, una implementazione C di un server FTP
+    \item \texttt{nlohmann::json}, una libreria per il parsing di file in
+    formato json in C++
+    \item \texttt{mongoose}, una libreria C per realizzare web server HTTP
+    \item \texttt{sha256}, una implementazione C dell'algoritmo di hashing sha256
+\end{itemize}
+
+Tutti questi sorgenti aggiuntivi saranno inclusi nell'analisi statica. La
+struttura delle directory è la seguente:
+
+\dirtree{%
+.1 3ds.
+.2 include.
+.2 source.
+.1 3rd-party.
+.1 common.
+.1 switch.
+.2 include.
+.2 source.
+}
+
+L'esecuzione di Cppcheck è molto semplice. Invocando il programma con \texttt{.}
+nella cartella radice, si analizzeranno tutti i file header e sorgente C/C++
+in tutte le cartelle innestate.
+
+\begin{lstlisting}[language=bash]
+cd checkpoint
+cppcheck . --enable=all --force
+\end{lstlisting}
+
+Si evidenziano per brevità solo alcuni problemi segnalati da Cppcheck:
+
+\begin{lstlisting}[language=bash]
+...
+
+3ds/source/configuration.cpp:134:24: style: Consider using std::transform algorithm instead of a raw loop. [useStlAlgorithm]
+            u16folders.push_back(StringUtils::UTF8toUTF16(folder.c_str()));
+                       ^
+3ds/source/spi.cpp:474:19: style: Variable '*type' is reassigned a value before the old one has been used. [redundantAssignment]
+            *type = FLASH_256KB_INFRARED;
+                  ^
+3ds/source/spi.cpp:472:19: note: *type is assigned
+            *type = NO_CHIP; // did anything go wrong?
+                  ^
+3ds/source/spi.cpp:474:19: note: *type is overwritten
+            *type = FLASH_256KB_INFRARED;
+                  ^
+3rd-party/ftp/ftp.c:1166:27: style: The scope of the variable 'args' can be reduced. [variableScope]
+  char          *buffer, *args, *next = NULL;
+3rd-party/ftp/ftp.c:699:37: style: Clarify calculation precedence for '&' and '?'. [clarifyCalculation]
+              st->st_mode & S_IWGRP ? 'w' : '-',
+                                    ^
+mongoose/src/mg_http_ssi.c:41:14: warning: sscanf() without field width limits can crash with huge input data. [invalidscanf]
+             ^
+mongoose/src/mg_http.c:2413:23: warning: Either the condition 'lp==NULL' is redundant or there is pointer arithmetic with NULL pointer. [nullPointerArithmeticRedundantCheck]
+                      ^
+mongoose/src/mg_http.c:2416:12: note: Assuming that condition 'lp==NULL' is not redundant
+           ^
+mongoose/src/mg_http.c:2413:23: note: Null pointer addition
+                      ^
+mongoose/src/mg_util.c:215:39: error: Pointer addition with NULL pointer. [nullPointerArithmetic]
+                                      ^
+switch/source/SDL_FontCache.c:2361:0: style: The function 'FC_SetSpacing' is never used. [unusedFunction]
+
+^
+...
+\end{lstlisting}
+
+Cppcheck ha:
+
+% \begin{itemize}
+%     \item suggerito una tecnica più efficiente per utilizzare una funzione di
+%     libreria (std::vector::push_back) e fornisce anche un'alternativa
+%     (std::transform).
+%     \item TODO ... 
+% \end{itemize}
 
 %----------------------------------------------------------------------------------------
 %	SECTION 6
