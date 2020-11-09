@@ -1011,6 +1011,9 @@ $ valgrind -s --leak-check=full --show-leak-kinds=all ./a.out
 \subsection{Caso di studio: Checkpoint}
 \label{sec:checkpoint}
 
+\includegraphics[width=0.68\textwidth]{images/checkpoint1.jpeg}
+\includegraphics[width=0.32\textwidth]{images/checkpoint2.png}
+
 Come esempio di software più realistico, scelgo di utilizzare il codice sorgente
 di un mio vecchio software scritto per essere eseguito su piattaforma Nintendo
 3DS e Nintendo Switch, \texttt{Checkpoint}. Checkpoint è un gestore di
@@ -1028,6 +1031,10 @@ Entrambi i programmi prevedono l'uso di librerie o sorgenti aggiuntivi di terze 
     \item \texttt{mongoose}, una libreria C per realizzare web server HTTP
     \item \texttt{sha256}, una implementazione C dell'algoritmo di hashing sha256
 \end{itemize}
+
+Altre librerie, come ad esempio SDL2 e citro2d, utilizzate per la parte grafica,
+non vengono incluse in quanto compilate staticamente all'interno
+dell'eseguibile. \\
 
 Tutti questi sorgenti aggiuntivi saranno inclusi nell'analisi statica. La
 struttura delle directory è la seguente:
@@ -1092,17 +1099,172 @@ switch/source/SDL_FontCache.c:2361:0: style: The function 'FC_SetSpacing' is nev
 
 Cppcheck ha:
 
-% \begin{itemize}
-%     \item suggerito una tecnica più efficiente per utilizzare una funzione di
-%     libreria (std::vector::push_back) e fornisce anche un'alternativa
-%     (std::transform).
-%     \item TODO ... 
-% \end{itemize}
+\begin{itemize}
+    \item suggerito una tecnica più efficiente per utilizzare una funzione di
+    libreria (\texttt{std::vector::push\_back}) e fornisce anche un'alternativa
+    (\texttt{std::transform})
+    \item segnalato che viene assegnato un valore ad una variabile prima che
+    venisse letto il suo valore precedente
+    \item segnalato che lo scope di alcune variabili può essere ridotto
+    \item segnalato ambiguità nell'ordine di esecuzione di condizioni di verità
+    e operazioni tra bit
+    \item segnalato che il modo in cui vengono utilizzate funzioni di libreria
+    può portare a dei crash in condizioni di input particolari
+    \item segnalato possibili operazioni aritmetiche con puntatori a NULL
+    \item segnalato funzioni definite ma mai chiamate
+\end{itemize}
+
+Lo strumento è quindi molto utile affinché vengano utilizzate tutte le best
+practices per la scrittura del codice sicuro.
+
+\subsection{Caso di studio: \texttt{ls}}
+
+Al fine di analizzare staticamente e dinamicamente una applicazione desktop,
+scelgo di studiare l'implementazione GNU di \texttt{ls}, l'utility di sistema
+per mostrare il contenuto di una directory e le proprietà dei file in essa.
+Il codice sorgente è scaricabile all'indirizzo
+\texttt{http://ftp.gnu.org/pub/gnu/coreutils}.
+
+La compilazione è molto semplice, e la generazione di un eseguibile su cui si
+possa utilizzare Valgrind si effettua con:
+
+\begin{lstlisting}[language=bash]
+./configure && make
+\end{lstlisting}
+
+Eseguendo Cppcheck, non si hanno segnalazioni, il che fa ben sperare dal punto
+di vista dell'analisi statica.
+
+Eseguendo Valgrind, invece:
+
+\begin{lstlisting}[language=bash]
+$ valgrind -s --leak-check=full --show-leak-kinds=all ./ls -l
+==30167== Memcheck, a memory error detector
+...
+==30167== HEAP SUMMARY:
+==30167==     in use at exit: 173,397 bytes in 409 blocks
+==30167==   total heap usage: 689 allocs, 280 frees, 403,907 bytes allocated
+==30167== 
+==30167== 32 bytes in 1 blocks are still reachable in loss record 1 of 8
+==30167==    at 0x483B7F3: malloc 
+==30167==    by 0x11E7AC: xmalloc (xmalloc.c:41)
+==30167==    by 0x1196DF: getuser (idcache.c:87)
+==30167==    by 0x112FAC: format_user_width (ls.c:4197)
+==30167==    by 0x113A37: gobble_file.constprop.0 (ls.c:3549)
+==30167==    by 0x114314: print_dir (ls.c:2995)
+==30167==    by 0x10DA8C: main (ls.c:1782)
+==30167== 
+==30167== 32 bytes in 1 blocks are still reachable in loss record 2 of 8
+==30167==    at 0x483B7F3: malloc 
+==30167==    by 0x11E7AC: xmalloc (xmalloc.c:41)
+==30167==    by 0x11988F: getgroup (idcache.c:169)
+==30167==    by 0x113CF7: format_group_width (ls.c:4205)
+==30167==    by 0x113CF7: gobble_file.constprop.0 (ls.c:3556)
+==30167==    by 0x114314: print_dir (ls.c:2995)
+==30167==    by 0x10DA8C: main (ls.c:1782)
+==30167== 
+==30167== 56 bytes in 1 blocks are still reachable in loss record 3 of 8
+==30167==    at 0x483B7F3: malloc 
+==30167==    by 0x11E7AC: xmalloc (xmalloc.c:41)
+==30167==    by 0x11E9C8: xmemdup (xmalloc.c:113)
+==30167==    by 0x11D680: clone_quoting_options (quotearg.c:125)
+==30167==    by 0x10D85E: decode_switches (ls.c:2317)
+==30167==    by 0x10D85E: main (ls.c:1650)
+==30167== 
+==30167== 56 bytes in 1 blocks are still reachable in loss record 4 of 8
+==30167==    at 0x483B7F3: malloc 
+==30167==    by 0x11E7AC: xmalloc (xmalloc.c:41)
+==30167==    by 0x11E9C8: xmemdup (xmalloc.c:113)
+==30167==    by 0x11D680: clone_quoting_options (quotearg.c:125)
+==30167==    by 0x10D8B5: decode_switches (ls.c:2327)
+==30167==    by 0x10D8B5: main (ls.c:1650)
+==30167== 
+==30167== 128 bytes in 1 blocks are still reachable in loss record 5 of 8
+==30167==    at 0x483B7F3: malloc 
+==30167==    by 0x11F729: tzalloc (time_rz.c:99)
+==30167==    by 0x10D9AF: main (ls.c:1689)
+==30167== 
+==30167== 3,445 bytes in 402 blocks are still reachable in loss record 6 of 8
+==30167==    at 0x483B7F3: malloc 
+==30167==    by 0x11E7AC: xmalloc (xmalloc.c:41)
+==30167==    by 0x11E9C8: xmemdup (xmalloc.c:113)
+==30167==    by 0x113265: gobble_file.constprop.0 (ls.c:3618)
+==30167==    by 0x114314: print_dir (ls.c:2995)
+==30167==    by 0x10DA8C: main (ls.c:1782)
+==30167== 
+==30167== 9,648 bytes in 1 blocks are still reachable in loss record 7 of 8
+==30167==    at 0x483B7F3: malloc 
+==30167==    by 0x11E7AC: xmalloc (xmalloc.c:41)
+==30167==    by 0x10F3FA: xnmalloc (xalloc.h:103)
+==30167==    by 0x10F3FA: sort_files (ls.c:4001)
+==30167==    by 0x114164: print_dir (ls.c:3053)
+==30167==    by 0x10DA8C: main (ls.c:1782)
+==30167== 
+==30167== 160,000 bytes in 1 blocks are still reachable in loss record 8 of 8
+==30167==    at 0x483DFAF: realloc 
+==30167==    by 0x11E819: xrealloc (xmalloc.c:61)
+==30167==    by 0x11305C: xnrealloc (xalloc.h:116)
+==30167==    by 0x11305C: gobble_file.constprop.0 (ls.c:3314)
+==30167==    by 0x114314: print_dir (ls.c:2995)
+==30167==    by 0x10DA8C: main (ls.c:1782)
+==30167== 
+==30167== LEAK SUMMARY:
+==30167==    definitely lost: 0 bytes in 0 blocks
+==30167==    indirectly lost: 0 bytes in 0 blocks
+==30167==      possibly lost: 0 bytes in 0 blocks
+==30167==    still reachable: 173,397 bytes in 409 blocks
+==30167==         suppressed: 0 bytes in 0 blocks
+==30167== 
+==30167== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
+\end{lstlisting}
+
+Nonostante \texttt{ls} sia un programma relativamente semplice, si evidenzia
+come, dopo la sua esecuzione, restino oltre 169KB di memoria non deallocata.
+Leggendo l'output del programma, si mostra che la maggior parte di questa
+memoria viene persa nella funzione \texttt{print\_dir}. \\
+
+Per completezza, eseguo anche \texttt{massif} per mostrare il grafico di
+utilizzo dell'heap. Viene generato in output un file chiamato
+\texttt{massif.out.32103}, dove \texttt{32103} è il pid del programma in
+esecuzione.
+
+\begin{lstlisting}[language=bash]
+$ valgrind --tool=massif ./ls -l
+\end{lstlisting}
+
+Stampo il grafico con \texttt{ms\_print massif.out.32103}.
+
+\begin{lstlisting}[language=bash]
+    KB
+213.9^                  #####################                                 
+     |                  #                     ::::::::::::::::::::::::::::::::
+     |                  #                    @@                              :
+     |                  #                    @@                              :
+     |                  #                    @@                              :
+     |                  #                    @@                              :
+     |                  #                    @@                              :
+     |                  #                    @@                              :
+     |             ::@::#                    @@                              :
+     |             ::@::#                    @@                              :
+     |             ::@::#                    @@                              :
+     |             ::@::#                    @@                              :
+     |         ::::::@::#                    @@                              :
+     |         ::::::@::#                    @@                              :
+     |     @@:@::::::@::#                    @@                              :
+     |     @@:@::::::@::#                    @@                              :
+     |     @@:@::::::@::#                    @@                              :
+     |     @@:@::::::@::#                    @@                              :
+     |     @@:@::::::@::#                    @@                              :
+     |   : @@:@::::::@::#                    @@                              :
+   0 +----------------------------------------------------------------------->Mi
+     0                                                                   5.393
+\end{lstlisting}
 
 %----------------------------------------------------------------------------------------
 %	SECTION 6
 %----------------------------------------------------------------------------------------
 
+\newpage
 \section{Conclusioni}
 
 \end{document}
