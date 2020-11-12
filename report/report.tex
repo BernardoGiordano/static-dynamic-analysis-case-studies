@@ -1232,7 +1232,8 @@ esecuzione.
 $ valgrind --tool=massif ./ls -l
 \end{lstlisting}
 
-Stampo il grafico con \texttt{ms\_print massif.out.32103}.
+Stampo il grafico con \texttt{ms\_print massif.out.32103}, che mi mostra
+l'utilizzo dell'heap nell'unità di tempo.
 
 \begin{lstlisting}[language=bash]
     KB
@@ -1256,7 +1257,7 @@ Stampo il grafico con \texttt{ms\_print massif.out.32103}.
      |     @@:@::::::@::#                    @@                              :
      |     @@:@::::::@::#                    @@                              :
      |   : @@:@::::::@::#                    @@                              :
-   0 +----------------------------------------------------------------------->Mi
+   0 +----------------------------------------------------------------------->
      0                                                                   5.393
 \end{lstlisting}
 
@@ -1266,5 +1267,20 @@ Stampo il grafico con \texttt{ms\_print massif.out.32103}.
 
 \newpage
 \section{Conclusioni}
+
+In questo lavoro si è evidenziata l'importanza dell'analisi statica e dinamica
+del software, al fine di evidenziare problemi relativi alla gestione della
+memoria allocata dinamicamente, che per applicazioni long running possono
+portare a conseguenze come quelle dell'aging. \\
+
+In particolare si sono evidenziate le peculiarità di due software come Cppcheck
+e Valgrind, mostrate le differenze e mostrato come, per diversi casi, i tool non
+sono perfettamente equivalenti, in quanto alcuni errori dovuti al coding
+scorretto sono rilevati dall'uno e non dall'altro, e viceversa. \\
+
+È quindi importante in fase di sviluppo del software eseguire regolarmente sia
+l'analisi statica che quella dinamica, in modo tale da evitare che detti
+problemi di coding si accumulino e comportino come consequenza un software non
+affidabile in condizioni critiche o che possa fallire in condizioni di scarsa manutenibilità.
 
 \end{document}
